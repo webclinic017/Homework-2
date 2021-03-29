@@ -33,7 +33,7 @@ while not ib.isConnected():
 # If connected, script proceeds and prints a success message.
 print('Connection Successful!')
 
-get_historical_data(ib, 'IVV')
+#print(get_historical_data(ib, 'IVV'))
 
 # Main while loop of the app. Stay in this loop until the app is stopped by the user.
 while True:
@@ -43,9 +43,9 @@ while True:
     # Use decision to place buy or sell order
     if (decision == 1):
         print('buy')
+        place_order(port, orders_client_id)
     else:
         print('sell')
 
-    sleep(2)
 
-    get_order_fills(ib)
+    sleep(2)

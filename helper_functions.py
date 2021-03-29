@@ -31,21 +31,25 @@ def get_historical_data(ib_connection, ticker):
 
 
 def place_order(port, orders_client_id):
-    ib_orders = IB()
-    ib_orders.connect(host='127.0.0.1', port=port, clientId=orders_client_id)
-    trd_ordr = LimitOrder(action='BUY', totalQuantity=100)
-    contract = Forex(trd_ordr['trade_currency'])
-    order = MarketOrder(trd_ordr['action'], trd_ordr['trade_amt'])
-    order.account = acc_number
-    new_order = ib_orders.placeOrder(contract, order)
+    ib = IB()
+    ib.connect(host='127.0.0.1', port=port, clientId=orders_client_id)
+    contract = Stock('IVV', 'SMART', 'USD')
+    ib.qualifyContracts(contract)
 
-    while not new_order.orderStatus.status == 'Filled':
-        ib_orders.sleep(0)
+    #Find current price
+    px = ib.reqMktData(contract, 221).last
+    px = 391.12
 
-    get_order_fills(ib_orders)
-    ib_orders.disconnect()
+    new_order = LimitOrder("Buy", 5, px)
+    print(new_order)
+    ib.placeOrder(contract, new_order)
+
+    sleep(100)
+    ib.disconnect()
+
 
 def get_order_fills(ib_connection):
     #stock_contract = Stock(ticker, "smart", 'USD')
     filled_orders = ib_connection.fills()
     print(filled_orders)
+

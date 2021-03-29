@@ -7,3 +7,21 @@
 6. Price ($347.50)
 7. Type + Special Parameters (LMT)
 
+
+
+#Strategy
+1. Wait till market close
+2. Draw trend line from historical data through volume weighted average for n days
+3. Calculate difference in closing price from mean (% deviation) using trend line for mean
+4. If deviation percent is less than threshold (-5%), then put out limit order to buy (% deviation) * (#shares alpha) at market close price (goes live when market opens)
+    - Limit order is good till market close (GTC)
+5. Check if limit order would fill based on high-low 
+6. If order fills, put out sell order for the same number of shares at some price (beta, greater than one) reltive to price
+7. 
+
+
+#Parameters
+1. n - size of window in days
+2. threshold
+3. alpha
+4. beta
