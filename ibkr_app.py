@@ -16,6 +16,16 @@ master_client_id = 12346
 orders_client_id = 1111
 # account number: you'll need to fill in yourself. The below is one of my paper trader account numbers.
 acc_number = 'DU3576436'
+# n-size of window in days that trendline is based on
+n_days = 252
+# start date of strategy
+strategy_start = pd.Timestamp("2019-01-02")
+# threshold for each increment (%)
+threshold = .05
+# Number of shares to buy for each threshold increment
+alpha = 5
+# Beta - sell point based on current price (number greater than equal to 1)
+beta = 1.05
 ########################################################################################################################
 
 # Run your helper function to clear out any io files left over from old runs
@@ -33,7 +43,7 @@ while not ib.isConnected():
 # If connected, script proceeds and prints a success message.
 print('Connection Successful!')
 
-#print(get_historical_data(ib, 'IVV'))
+print(get_historical_data(ib, 'IVV'))
 
 # Main while loop of the app. Stay in this loop until the app is stopped by the user.
 while True:

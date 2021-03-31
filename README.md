@@ -8,7 +8,6 @@
 7. Type + Special Parameters (LMT)
 
 
-
 #Strategy
 1. Wait till market close
 2. Draw trend line from historical data through volume weighted average for n days
@@ -21,7 +20,15 @@
 
 
 #Parameters
-1. n - size of window in days
-2. threshold
-3. alpha
-4. beta
+1. n - size of window in day
+2. start date of strategy
+3. threshold
+4. alpha
+5. beta
+
+
+
+TODO
+1. Scrape data to get S&P500 data (done?)
+2. Check if there is enough data for the window and the start of strategy date
+3. Don't create dataframe twice when creating df_window

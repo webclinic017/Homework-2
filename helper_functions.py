@@ -24,7 +24,7 @@ def check_for_and_del_io_files():
 def get_historical_data(ib_connection, ticker):
     with open('stock_data/' + ticker + '.csv', 'w'):
         stock_contract = Stock(ticker, "smart", 'USD')
-        bars = ib_connection.reqHistoricalData(stock_contract, endDateTime='', durationStr='1 Y', barSizeSetting='1 day',
+        bars = ib_connection.reqHistoricalData(stock_contract, endDateTime='', durationStr='5 Y', barSizeSetting='1 day',
                                                whatToShow='MIDPOINT', useRTH=True)
         bars = pd.DataFrame(bars)
         bars.to_csv('stock_data/' + ticker + '.csv')
@@ -46,6 +46,8 @@ def place_order(port, orders_client_id):
 
     sleep(100)
     ib.disconnect()
+
+
 
 
 def get_order_fills(ib_connection):
