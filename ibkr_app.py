@@ -43,7 +43,7 @@ while not ib.isConnected():
 # If connected, script proceeds and prints a success message.
 print('Connection Successful!')
 
-print(get_historical_data(ib, 'IVV'))
+print(get_historical_us_stock_data(ib, 'IVV'))
 
 # Main while loop of the app. Stay in this loop until the app is stopped by the user.
 while True:

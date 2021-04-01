@@ -21,7 +21,7 @@ def check_for_and_del_io_files():
     pass  # nothing gets returned by this function, so end it with 'pass'.
 
 
-def get_historical_data(ib_connection, ticker):
+def get_historical_us_stock_data(ib_connection, ticker):
     with open('stock_data/' + ticker + '.csv', 'w'):
         stock_contract = Stock(ticker, "smart", 'USD')
         bars = ib_connection.reqHistoricalData(stock_contract, endDateTime='', durationStr='5 Y', barSizeSetting='1 day',
