@@ -47,10 +47,22 @@ def get_stock_data_from_csv(ticker):
 
 
 def get_date_id(df, date):
+    if df == 0:
+        df = pd.read_csv('strategy_files/backtest.csv')
     try:
         return df.loc[df['date'] == date, 'id'].values[0]
     except IndexError:
         return -1
+
+
+def calc_average_daily_return(start_date, end_date, start_price, end_price):
+    id1 = get_date_id(0, start_date)
+    id2 = get_date_id(0, end_date)
+    if id2 == -1:
+        return None
+    else:
+        avg_d_return = ((end_price/start_price) ** (1/(id2-id1)) - 1) * 100
+    return avg_d_return
 
 
 def calc_today_expected_price(stock, n_days):
@@ -182,8 +194,8 @@ def decide_to_buy_or_not(ratio, threshold):
 
 
 # Create an order to insert into the blotter
-def create_order(i, date, symbol, action, size_factor, price):
-    df1 = pd.DataFrame({"trade_id": i, "date": date, "symb": symbol, "actn": action, "size_factor": size_factor,
+def create_order(i, pair, date, symbol, action, size_factor, price):
+    df1 = pd.DataFrame({"trade_id": i, "pair_id": pair, "date": date, "symb": symbol, "actn": action, "size_factor": size_factor,
                         "size": 0, "price": price, "type": "LMT"}, index=[i])
     return df1
 
@@ -212,8 +224,9 @@ def trade_size(sz_f, a, cash, close):
 # Function to create blotter of trades
 def build_testing_blotter(backtest, ticker, threshold, beta):
     # Create blotter to track orders placed
-    blotter = pd.DataFrame(columns=["trade_id", "date", "symb", "actn", "size_factor", "size", "price", "type"])
+    blotter = pd.DataFrame(columns=["trade_id", "pair_id", "date", "symb", "actn", "size_factor", "size", "price", "type"])
     i = 0
+    pair_id = 0
     # Look at price every day from testing period
     for index, row in backtest.iterrows():
         # Decide if a buy order needs to happen
@@ -224,11 +237,13 @@ def build_testing_blotter(backtest, ticker, threshold, beta):
             size_factor = trade_size_factor(row['close_to_trend_ratio'], threshold)
             buy_price = row['close']
             sell_price = buy_price * beta
-            new_buy_order = create_order(i, date, ticker, "BUY", size_factor, buy_price)
-            new_sell_order = create_order(i+1, date, ticker, "SELL", size_factor, sell_price)
+            new_buy_order = create_order(i, pair_id, date, ticker, "BUY", size_factor, buy_price)
+            new_sell_order = create_order(i+1, pair_id, date, ticker, "SELL", size_factor, sell_price)
             blotter = blotter.append(new_buy_order)
             blotter = blotter.append(new_sell_order)
             i = i + 2
+            pair_id = pair_id + 1
+    blotter = round_dollars(blotter, ['price'])
     return blotter
 
 
@@ -236,6 +251,19 @@ def build_testing_blotter(backtest, ticker, threshold, beta):
 def order_by_date_column(df, column_name):
     df[column_name] = pd.to_datetime(df[column_name])
     df = df.sort_values(by=column_name)
+    return df
+
+
+# Order any dataframe by any date column
+def reorder_blotter(df, column_name):
+    df[column_name] = pd.to_datetime(df[column_name])
+    df = df.sort_values([column_name, 'actn'], ascending=[True, True])
+    return df
+
+
+def round_dollars(df, columns):
+    for i in columns:
+        df = df.round({i: 2})
     return df
 
 
@@ -292,7 +320,35 @@ def track_portfolio_progress(df_blot, df_backtest, a, strategy_start, portfolio_
                 df_blot = update_trade_order_size(df_blot, n_shares, row2['trade_id'], row2['actn'])
                 # Update portfolio
                 df_port = update_portfolio(df_port, date, n_shares, row2['price'], close)
+    df_port = round_dollars(df_port, ['USD', 'IVV_value', 'Total'])
     return df_port
+
+
+def build_ledger(df):
+    # Create ledger dataframe to track orders
+    ledger = pd.DataFrame(columns=["pair_id", "trade_open", "position", "enter_price", "trade_closed", "exit_price",
+                                   "avg_daily_return"])
+    # Loop through pair ids and add to ledger
+    for i in range(0, df.tail(1)['pair_id'].values[0] + 1, 1):
+        # Create dataframe of associated pair_id's
+        buy = ((df['pair_id'] == i) & (df['actn'] == 'BUY'))
+        sell = ((df['pair_id'] == i) & (df['actn'] == 'SELL'))
+        df_buy = df.loc[buy]
+        df_sell = df.loc[sell]
+        trade_open = pd.to_datetime(df_buy['fill_date'].values[0]).strftime('%Y-%m-%d')
+        position = df_buy['size'].values[0]
+        enter_price = df_buy['price'].values[0]
+        exit_price = df_sell['price'].values[0]
+        if df_sell['filled'].bool():
+            trade_closed = pd.to_datetime(df_sell['fill_date'].values[0]).strftime('%Y-%m-%d')
+        else:
+            trade_closed = 'OPEN'
+        avg_d_return = calc_average_daily_return(trade_open, trade_closed, enter_price, exit_price)
+        ledger_entry = pd.DataFrame({"pair_id": i, "trade_open": trade_open, "position": position,
+                                     "enter_price": enter_price, "trade_closed": trade_closed,
+                                     "exit_price": exit_price, "avg_daily_return": avg_d_return}, index=[i])
+        ledger = ledger.append(ledger_entry)
+    return ledger
 
 
 def calc_portfolio_gain(df):
@@ -312,24 +368,27 @@ def decide_to_buy_or_sell():
     print(choice)
     return choice
 
+pd.set_option('display.max_columns', None)
 
 def run_strategy(ticker, window, start_date, thresh, alpha, b, port_bal):
     #get_historical_us_stock_data(ticker)
     check_for_and_del_strategy_files()
     df_ticker_all = get_stock_data_from_csv(ticker)
     df_backtest_data = build_backtest_dataset(df_ticker_all, start_date, window)
+    df_backtest_data.to_csv('strategy_files/backtest.csv', index=False)
     df_blotter = build_testing_blotter(df_backtest_data, ticker, thresh, b)
     df_blotter = log_fill_dates(df_blotter, df_backtest_data)
     df_blotter_by_fill_date = order_by_date_column(df_blotter, 'fill_date')
     df_portfolio = track_portfolio_progress(df_blotter_by_fill_date, df_backtest_data, alpha, start_date, port_bal)
-    df_blotter = order_by_date_column(df_blotter_by_fill_date, 'date')
-    # Output dataframes to csv files
+    df_blotter = reorder_blotter(df_blotter_by_fill_date, 'date')
+    df_ledger = build_ledger(df_blotter)
+    #Output remaining files to csv
     df_blotter.to_csv('strategy_files/blotter.csv', index=False)
-    df_backtest_data.to_csv('strategy_files/backtest.csv', index=False)
     df_portfolio.to_csv('strategy_files/portfolio.csv', index=False)
+    df_ledger.to_csv('strategy_files/ledger.csv', index=False)
 
 
-#run_strategy('IVV', 250, pd.Timestamp("2020-09-01"), 0.1, .01, 1.01, 100000)
+# run_strategy('IVV', 500, pd.Timestamp("2019-01-01"), 0.02, .03, 1.45, 100000)
 
 
 # def create_strat_permutations(min_window, max_window, window_i, start_date, thresh_min, thresh_max, thresh_i, alpha_min,
