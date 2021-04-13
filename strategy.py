@@ -1,9 +1,16 @@
 from datetime import datetime as dt
+from dateutil import rrule
 import math
 import numpy as np
 import random
 import pandas as pd
+from helper_functions import *
 
+
+# For IBG Paper account, default port is 4002
+port = 7497
+# choose your master id. Mine is 10645. You can use whatever you want, just set it in API Settings within TWS or IBG.
+strat_client_id = 12347
 #ticker = 'IVV'
 # n-size of window in days that trendline is based on
 # n_days = 252
@@ -44,6 +51,14 @@ def get_date_id(df, date):
         return df.loc[df['date'] == date, 'id'].values[0]
     except IndexError:
         return -1
+
+
+def calc_today_expected_price(stock, n_days):
+    df_all = get_stock_data_from_csv(stock)
+    m, b = calc_trend_line(df_all, n_days, dt.today())
+    x = df_all.tail(1)['id']
+    expected_price = calc_expected_value(m, b, x)
+    return expected_price.values[0]
 
 
 def calc_expected_value(m, b, x):
@@ -299,6 +314,8 @@ def decide_to_buy_or_sell():
 
 
 def run_strategy(ticker, window, start_date, thresh, alpha, b, port_bal):
+    #get_historical_us_stock_data(ticker)
+    check_for_and_del_strategy_files()
     df_ticker_all = get_stock_data_from_csv(ticker)
     df_backtest_data = build_backtest_dataset(df_ticker_all, start_date, window)
     df_blotter = build_testing_blotter(df_backtest_data, ticker, thresh, b)
@@ -306,11 +323,57 @@ def run_strategy(ticker, window, start_date, thresh, alpha, b, port_bal):
     df_blotter_by_fill_date = order_by_date_column(df_blotter, 'fill_date')
     df_portfolio = track_portfolio_progress(df_blotter_by_fill_date, df_backtest_data, alpha, start_date, port_bal)
     df_blotter = order_by_date_column(df_blotter_by_fill_date, 'date')
-    return df_backtest_data, df_portfolio, df_blotter
+    # Output dataframes to csv files
+    df_blotter.to_csv('strategy_files/blotter.csv', index=False)
+    df_backtest_data.to_csv('strategy_files/backtest.csv', index=False)
+    df_portfolio.to_csv('strategy_files/portfolio.csv', index=False)
 
 
-df_backtest, df_portfolio, df_blotter = run_strategy('IVV', 252, pd.Timestamp("2019-01-02"), 0.05, .03, 1.3, 100000)
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-print(df_blotter)
-print(df_portfolio)
+#run_strategy('IVV', 250, pd.Timestamp("2020-09-01"), 0.1, .01, 1.01, 100000)
+
+
+# def create_strat_permutations(min_window, max_window, window_i, start_date, thresh_min, thresh_max, thresh_i, alpha_min,
+#                               alpha_max, alpha_i, beta_min, beta_max, beta_i):
+#     strat_permutations = pd.DataFrame(columns=['window', 'start', 'end', 'threshold', 'alpha', 'beta', 'port_balance'])
+#     i = 0
+#     for w in range(min_window, max_window+1, window_i):
+#         for s in rrule.rrule(rrule.YEARLY, dtstart=start_date, until=dt.today()):
+#             for t in np.arange(thresh_min, thresh_max+0.000001, thresh_i):
+#                 for a in np.arange(alpha_min, alpha_max+0.000001, alpha_i):
+#                     for b in np.arange(beta_min, beta_max+0.000001, beta_i):
+#                         port_balance = 100000
+#                         df = pd.DataFrame({"window": w, "start": s.strftime('%Y-%m-%d'), "end": dt.today().strftime('%Y-%m-%d'),
+#                                            "threshold": t, "alpha": a, "beta": b, "port_balance": port_balance}, index=[i])
+#                         strat_permutations = strat_permutations.append(df)
+#                         i = i + 1
+#                         print(i)
+#     return strat_permutations
+#
+#
+# strat_perms = create_strat_permutations(252, 800, 252, pd.Timestamp("2015-01-01"), 0.01, 0.1, 0.02, 0.01, 0.1, 0.02,                                        1.01, 1.5, 0.02)
+# strat_perms.to_csv('strategy_files/permutations.csv')
+#
+# def track_strategy_permutations(permutations):
+#     strat_perms_perf = pd.DataFrame(columns=['window', 'start', 'end', 'threshold', 'alpha', 'beta', 'start_balance',
+#                                              'end_balance'])
+#     i = 0
+#     for index, row in permutations.iterrows():
+#         window = row['window']
+#         start = row['start']
+#         thresh = row['threshold']
+#         alpha = row['alpha']
+#         beta = row['beta']
+#         start_balance = row['port_balance']
+#         run_strategy('IVV', window, pd.Timestamp(start), thresh, alpha, beta, start_balance)
+#         portfolio = pd.read_csv("strategy_files/portfolio.csv")
+#         end_balance = portfolio.tail(1)['Total'].values[0]
+#         df = pd.DataFrame({"window": window, "start": start, "end": dt.today().strftime('%Y-%m-%d'),
+#                            "threshold": thresh, "alpha": alpha, "beta": beta, "start_balance": start_balance,
+#                            "end_balance": end_balance}, index=[i])
+#         strat_perms_perf = strat_perms_perf.append(df, ignore_index=True)
+#         i = i + 1
+#         print(i)
+#     strat_perms_perf.to_csv('strategy_files/permutation_performance')
+#
+#
+# track_strategy_permutations(strat_perms)
